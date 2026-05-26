@@ -1,0 +1,45 @@
+{
+  "model": "Qwen/Qwen2.5-3B",
+  "n_layers": 36,
+  "hidden": 2048,
+  "intermediate": 11008,
+  "top_k_per_neuron": 10,
+  "mercury_named": {
+    "11": {
+      "name": "anchor-11",
+      "role": "cross-Qwen-family conserved"
+    },
+    "25": {
+      "name": "anchor-25",
+      "role": "cross-Qwen-family conserved"
+    },
+    "279": {
+      "name": "pathway-A",
+      "role": "Pathway A (style transfer)"
+    },
+    "382": {
+      "name": "pathway-B",
+      "role": "Pathway B (functional control)"
+    },
+    "476": {
+      "name": "pathway-A2",
+      "role": "Pathway A secondary"
+    },
+    "481": {
+      "name": "style-destab",
+      "role": "destabilization marker"
+    },
+    "715": {
+      "name": "INHIBITOR",
+      "role": "selective suppression (Mercury Paper B)"
+    },
+    "758": {
+      "name": "CONTROLLER",
+      "role": "single-dim style controller"
+    }
+  },
+  "extract_time_sec": 85.0,
+  "total_nodes": 73728,
+  "total_edges": 716800,
+  "total_highways": 2056
+}

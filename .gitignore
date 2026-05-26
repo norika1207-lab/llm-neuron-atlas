@@ -1,0 +1,25 @@
+# model weights (huge, never commit)
+weights/
+*.safetensors
+*.bin
+
+# baked output (regenerable, big)
+viewer/graph/nodes.json
+viewer/graph/edges.json
+viewer/graph/highways.json
+viewer/graph/hotness.json
+viewer/graph/match-*.json
+viewer/graph/anchor-matrix.json
+
+# python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# macOS
+.DS_Store
+
+# IDE
+.idea/
+.vscode/

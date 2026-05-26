@@ -1,0 +1,845 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="utf-8">
+<title>Qwen 2.5 3B Neuron Atlas — Mercury Edition</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{width:100%;height:100%;overflow:hidden;background:#000;color:#cdd6f4;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif}
+  #canvas{position:fixed;inset:0}
+  #hud{position:fixed;top:12px;left:12px;background:rgba(11,15,25,.85);padding:10px 14px;border:1px solid #1e2540;border-radius:8px;font-size:12px;line-height:1.5;backdrop-filter:blur(8px);max-width:280px}
+  #hud h1{font-size:13px;color:#7dd3fc;margin-bottom:4px;font-weight:600}
+  #hud .stat{color:#9ca3af}
+  #hud .stat b{color:#cdd6f4}
+  #panel{position:fixed;top:12px;right:12px;width:340px;background:rgba(11,15,25,.92);border:1px solid #1e2540;border-radius:8px;padding:14px;font-size:12px;line-height:1.55;backdrop-filter:blur(8px);max-height:80vh;overflow-y:auto;display:none}
+  #panel.show{display:block}
+  #panel h2{font-size:14px;color:#fbbf24;margin-bottom:8px}
+  #panel .row{display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px solid #1a1d24}
+  #panel .row b{color:#7dd3fc}
+  #panel .meta{margin:8px 0;padding:8px;background:#0a0d18;border-radius:6px;border-left:3px solid #ff1744;font-size:11.5px}
+  #panel .meta.controller{border-color:#00e676}
+  #panel .meta.pathway{border-color:#3b82f6}
+  #panel .edges{margin-top:10px}
+  #panel .edges h3{font-size:11px;color:#9ca3af;text-transform:uppercase;letter-spacing:.5px;margin:6px 0 4px}
+  #panel .edge{display:flex;justify-content:space-between;padding:2px 6px;font-family:'SF Mono',Menlo,monospace;font-size:10.5px;color:#cdd6f4;cursor:pointer;border-radius:3px}
+  #panel .edge:hover{background:#1a1d24}
+  #panel .edge .w{color:#fbbf24}
+  #panel .edge .w.neg{color:#ff6b6b}
+  #panel .close{position:absolute;top:8px;right:10px;cursor:pointer;color:#9ca3af;font-size:18px}
+  #panel .close:hover{color:#cdd6f4}
+  #help{position:fixed;bottom:12px;left:12px;background:rgba(11,15,25,.7);padding:8px 12px;border-radius:6px;font-size:10.5px;color:#7c7c8c;line-height:1.6;border:1px solid #1a1d24}
+  #help kbd{background:#1a1d24;padding:1px 5px;border-radius:3px;color:#cdd6f4;font-family:'SF Mono',Menlo,monospace;font-size:10px}
+  #loading{position:fixed;inset:0;background:#000;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;color:#7dd3fc;font-size:14px;z-index:100}
+  #loading .bar{width:280px;height:3px;background:#1a1d24;border-radius:2px;overflow:hidden}
+  #loading .bar .fill{height:100%;background:#7dd3fc;width:0;transition:width .3s}
+  #legend{position:fixed;bottom:12px;right:12px;background:rgba(11,15,25,.85);padding:10px 12px;border:1px solid #1e2540;border-radius:6px;font-size:11px;line-height:1.6}
+  #legend .row{display:flex;align-items:center;gap:8px;padding:1px 0}
+  #legend .dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+  #search{position:fixed;top:12px;left:50%;transform:translateX(-50%);background:rgba(11,15,25,.92);border:1px solid #1e2540;border-radius:8px;padding:6px 10px;font-size:12px;display:flex;gap:8px;align-items:center;backdrop-filter:blur(8px)}
+  #search input{background:#0a0d18;border:1px solid #1e2540;color:#cdd6f4;padding:5px 10px;border-radius:5px;font-family:'SF Mono',Menlo,monospace;font-size:12px;width:160px;outline:none}
+  #search input:focus{border-color:#7dd3fc}
+  #search .hint{color:#7c7c8c;font-size:10.5px}
+  #search button{background:#1a1d24;border:1px solid #1e2540;color:#cdd6f4;padding:5px 10px;border-radius:5px;cursor:pointer;font-size:11px}
+  #search button:hover{background:#252b3a}
+  #toolbar{position:fixed;top:60px;left:50%;transform:translateX(-50%);display:flex;gap:6px}
+  #toolbar button{background:rgba(11,15,25,.92);border:1px solid #1e2540;color:#cdd6f4;padding:6px 10px;border-radius:6px;cursor:pointer;font-size:11px;backdrop-filter:blur(8px)}
+  #toolbar button:hover{background:#1a1d24;border-color:#7dd3fc}
+</style>
+</head>
+<body>
+<canvas id="canvas"></canvas>
+
+<div id="loading">
+  <div>Loading Qwen 2.5 3B atlas...</div>
+  <div class="bar"><div class="fill" id="lfill"></div></div>
+  <div id="ltxt" style="font-size:11px;color:#7c7c8c"></div>
+</div>
+
+<div id="hud">
+  <h1>Qwen 2.5 3B · Neuron Atlas</h1>
+  <div class="stat"><b id="s-nodes">—</b> neurons across <b id="s-layers">36</b> layers</div>
+  <div class="stat"><b id="s-edges">—</b> connections (top-10/neuron)</div>
+  <div class="stat"><b id="s-named">8</b> Mercury named anchors</div>
+  <div class="stat" style="margin-top:6px;color:#fbbf24">Click a neuron to explore its connections</div>
+</div>
+
+<div id="panel">
+  <span class="close" onclick="closePanel()">×</span>
+  <div id="panel-body"></div>
+</div>
+
+<div id="search">
+  <input id="searchInput" placeholder="L17.D715 or just 715" autocomplete="off">
+  <button id="searchGo">jump</button>
+  <span class="hint">try: 715, 758, L0.D279</span>
+</div>
+
+<div id="toolbar">
+  <button id="btnReset">⌂ reset view</button>
+  <button id="btnShot">📷 screenshot</button>
+  <button id="btnTour">🎬 tour anchors</button>
+</div>
+
+<div id="legend">
+  <div class="row"><span class="dot" style="background:#ff1744"></span> INHIBITOR (dim 715)</div>
+  <div class="row"><span class="dot" style="background:#00e676"></span> CONTROLLER (dim 758)</div>
+  <div class="row"><span class="dot" style="background:#3b82f6"></span> Pathway A/B</div>
+  <div class="row"><span class="dot" style="background:#fbbf24"></span> Mercury anchor</div>
+  <div class="row"><span class="dot" style="background:#ff8c00"></span> Mercury hot (observed)</div>
+  <div class="row"><span class="dot" style="background:#3a4d5c"></span> Unnamed neuron</div>
+  <div class="row" style="margin-top:6px;border-top:1px solid #1e2540;padding-top:6px"><span class="dot" style="background:#a78bfa"></span> Phi-3 (40 layers)</div>
+  <div class="row"><span class="dot" style="background:#6ee7b7"></span> Mistral 7B (32 layers)</div>
+</div>
+
+<div id="help">
+  <kbd>drag</kbd> rotate · <kbd>scroll</kbd> zoom · <kbd>WASD</kbd> pan · <kbd>R</kbd> reset · <kbd>click</kbd> neuron
+</div>
+
+<script type="importmap">
+{ "imports": { "three": "https://esm.sh/three@0.160.0", "three/addons/": "https://esm.sh/three@0.160.0/examples/jsm/" } }
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+
+const N_LAYERS = 36, HIDDEN = 2048;
+const LAYER_SPACING = 18;
+const GRID_COLS = 64, GRID_ROWS = 32;  // 64*32 = 2048
+const CELL_SIZE = 0.9;
+const LAYER_W = GRID_COLS * CELL_SIZE;
+const LAYER_H = GRID_ROWS * CELL_SIZE;
+
+// === colors ===
+const C_INHIBITOR = 0xff1744;
+const C_CONTROLLER = 0x00e676;
+const C_PATHWAY = 0x3b82f6;
+const C_ANCHOR = 0xfbbf24;
+const C_UNNAMED = 0x2a3142;
+const C_HOT = 0xff8c00;  // Mercury observed hot neuron
+const C_LAYER_FRAME = 0x1e2540;
+const C_HIGHWAY = 0xfbbf24;
+const C_EDGE_POS = 0xfbbf24;
+const C_EDGE_NEG = 0xff6b6b;
+
+// === 5 layer regions from Mercury Tier-B analysis ===
+const LAYER_REGIONS = [
+  { range: [0, 3],   name: 'embed-detok',     color: 0x5b8def, role: 'token embedding + early detokenization' },
+  { range: [4, 11],  name: 'surface',         color: 0x6ee7b7, role: 'surface-form & syntactic features' },
+  { range: [12, 21], name: 'structural',      color: 0xfbbf24, role: 'structural / dependency tracking' },
+  { range: [22, 31], name: 'semantic',        color: 0xf472b6, role: 'semantic abstraction (Mercury hot zone)' },
+  { range: [32, 35], name: 'output-decoding', color: 0xff8c69, role: 'output projection + decoding' },
+];
+function regionForLayer(L) { return LAYER_REGIONS.find(r => L >= r.range[0] && L <= r.range[1]); }
+
+// === scene ===
+const canvas = document.getElementById('canvas');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.setClearColor(0x02030a);
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.0;
+
+const scene = new THREE.Scene();
+scene.fog = new THREE.FogExp2(0x05071a, 0.0018);
+
+// === starfield background ===
+{
+  const starCount = 4000;
+  const starGeom = new THREE.BufferGeometry();
+  const starPos = new Float32Array(starCount * 3);
+  const starCol = new Float32Array(starCount * 3);
+  for (let i = 0; i < starCount; i++) {
+    const r = 1500 + Math.random() * 800;
+    const th = Math.random() * Math.PI * 2;
+    const ph = Math.acos(2 * Math.random() - 1);
+    starPos[i*3]   = r * Math.sin(ph) * Math.cos(th);
+    starPos[i*3+1] = r * Math.sin(ph) * Math.sin(th);
+    starPos[i*3+2] = r * Math.cos(ph);
+    const t = Math.random();
+    starCol[i*3]   = 0.7 + 0.3 * t;
+    starCol[i*3+1] = 0.7 + 0.3 * t;
+    starCol[i*3+2] = 0.9 + 0.1 * t;
+  }
+  starGeom.setAttribute('position', new THREE.BufferAttribute(starPos, 3));
+  starGeom.setAttribute('color', new THREE.BufferAttribute(starCol, 3));
+  const starMat = new THREE.PointsMaterial({ size: 1.4, vertexColors: true, transparent: true, opacity: 0.85, depthWrite: false, sizeAttenuation: false });
+  scene.add(new THREE.Points(starGeom, starMat));
+}
+
+// === nebula gradient sphere (background tint) ===
+{
+  const nebGeom = new THREE.SphereGeometry(2200, 32, 32);
+  const nebMat = new THREE.ShaderMaterial({
+    side: THREE.BackSide, depthWrite: false,
+    uniforms: { },
+    vertexShader: `varying vec3 vWorldPos; void main(){ vWorldPos = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.); }`,
+    fragmentShader: `varying vec3 vWorldPos; void main(){ float h = normalize(vWorldPos).y * 0.5 + 0.5; vec3 top = vec3(0.02,0.03,0.10); vec3 mid = vec3(0.05,0.04,0.18); vec3 bot = vec3(0.02,0.02,0.06); vec3 c = mix(bot, mid, smoothstep(0.0,0.5,h)); c = mix(c, top, smoothstep(0.5,1.0,h)); gl_FragColor = vec4(c, 1.0); }`
+  });
+  scene.add(new THREE.Mesh(nebGeom, nebMat));
+}
+
+const camera = new THREE.PerspectiveCamera(55, innerWidth / innerHeight, 0.5, 3000);
+const TOWER_MID_Y = N_LAYERS * LAYER_SPACING / 2;
+const HOME = new THREE.Vector3(210, TOWER_MID_Y + 80, 280);
+camera.position.copy(HOME);
+
+const controls = new OrbitControls(camera, canvas);
+controls.target.set(0, TOWER_MID_Y, 0);
+controls.enableDamping = true;
+controls.dampingFactor = 0.08;
+controls.minDistance = 8;
+controls.maxDistance = 1500;
+controls.update();
+
+scene.add(new THREE.AmbientLight(0xffffff, 0.35));
+const dirLight = new THREE.DirectionalLight(0xffffff, 0.6);
+dirLight.position.set(100, 200, 100);
+scene.add(dirLight);
+const fillLight = new THREE.PointLight(0x7dd3fc, 0.6, 1200, 1.2);
+fillLight.position.set(0, TOWER_MID_Y, 0);
+scene.add(fillLight);
+
+// === postprocessing: bloom ===
+const composer = new EffectComposer(renderer);
+composer.setPixelRatio(Math.min(devicePixelRatio, 2));
+composer.setSize(innerWidth, innerHeight);
+composer.addPass(new RenderPass(scene, camera));
+const bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.55, 0.55, 0.85);
+composer.addPass(bloom);
+composer.addPass(new OutputPass());
+
+// === layer floors with region coloring ===
+for (let L = 0; L < N_LAYERS; L++) {
+  const y = L * LAYER_SPACING;
+  const region = regionForLayer(L);
+  // frame colored by region
+  const frameGeom = new THREE.EdgesGeometry(new THREE.BoxGeometry(LAYER_W + 2, 0.5, LAYER_H + 2));
+  const frame = new THREE.LineSegments(frameGeom, new THREE.LineBasicMaterial({ color: region.color, transparent: true, opacity: 0.85, toneMapped: false }));
+  frame.position.y = y;
+  scene.add(frame);
+  // translucent floor tinted by region
+  const floorGeom = new THREE.PlaneGeometry(LAYER_W + 1.5, LAYER_H + 1.5);
+  const floor = new THREE.Mesh(floorGeom, new THREE.MeshBasicMaterial({ color: region.color, transparent: true, opacity: 0.07, side: THREE.DoubleSide, depthWrite: false }));
+  floor.rotation.x = -Math.PI / 2;
+  floor.position.y = y - 0.4;
+  scene.add(floor);
+  // label
+  const labelCanvas = document.createElement('canvas');
+  labelCanvas.width = 320; labelCanvas.height = 64;
+  const ctx = labelCanvas.getContext('2d');
+  ctx.fillStyle = '#' + region.color.toString(16).padStart(6, '0');
+  ctx.font = 'bold 30px sans-serif';
+  ctx.fillText(`L${L}`, 10, 42);
+  ctx.fillStyle = '#7c7c8c';
+  ctx.font = '18px sans-serif';
+  ctx.fillText(region.name, 60, 42);
+  const labelTex = new THREE.CanvasTexture(labelCanvas);
+  const labelSprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: labelTex, transparent: true, depthTest: false }));
+  labelSprite.position.set(-LAYER_W / 2 - 10, y, -LAYER_H / 2);
+  labelSprite.scale.set(12, 2.4, 1);
+  scene.add(labelSprite);
+}
+
+// === data fetch ===
+const lfill = document.getElementById('lfill');
+const ltxt = document.getElementById('ltxt');
+async function fetchJSON(url, label, weight) {
+  ltxt.textContent = label;
+  const r = await fetch(url);
+  const j = await r.json();
+  lfill.style.width = `${weight}%`;
+  return j;
+}
+
+const META = await fetchJSON('graph/meta.json', 'meta...', 6);
+const HOTNESS = await fetchJSON('graph/hotness.json', 'Mercury hotness...', 12);
+const MATCH_PHI3 = await fetchJSON('graph/match-qwen3b-vs-phi3.json', 'phi3 alignment...', 18);
+const MATCH_MISTRAL = await fetchJSON('graph/match-qwen3b-vs-mistral.json', 'mistral alignment...', 22);
+const NODES = await fetchJSON('graph/nodes.json', 'nodes (73,728)...', 38);
+const HIGHWAYS = await fetchJSON('graph/highways.json', 'highways...', 55);
+const EDGES = await fetchJSON('graph/edges.json', 'edges (716K)...', 100);
+
+// build hotness lookup: layer.dim -> heat
+const heatMap = new Map();
+for (const h of HOTNESS.hottest) heatMap.set(`${h.layer}.${h.dim}`, h.heat);
+
+// === stats ===
+document.getElementById('s-nodes').textContent = NODES.length.toLocaleString();
+document.getElementById('s-edges').textContent = EDGES.length.toLocaleString();
+
+// === build edge lookup ===
+const edgesBySource = new Map();
+const edgesByTarget = new Map();
+for (const e of EDGES) {
+  const sk = `${e.src_layer}.${e.src_dim}`;
+  const tk = `${e.dst_layer}.${e.dst_dim}`;
+  if (!edgesBySource.has(sk)) edgesBySource.set(sk, []);
+  if (!edgesByTarget.has(tk)) edgesByTarget.set(tk, []);
+  edgesBySource.get(sk).push(e);
+  edgesByTarget.get(tk).push(e);
+}
+
+// === position function ===
+function neuronPos(layer, dim) {
+  const col = dim % GRID_COLS;
+  const row = Math.floor(dim / GRID_COLS);
+  const x = (col - GRID_COLS / 2 + 0.5) * CELL_SIZE;
+  const z = (row - GRID_ROWS / 2 + 0.5) * CELL_SIZE;
+  const y = layer * LAYER_SPACING;
+  return new THREE.Vector3(x, y, z);
+}
+
+// === instanced mesh for 73K neurons (unlit + overbright colors trigger bloom selectively) ===
+const sphereGeom = new THREE.SphereGeometry(0.34, 10, 10);
+const baseMat = new THREE.MeshBasicMaterial({ toneMapped: false });
+const instMesh = new THREE.InstancedMesh(sphereGeom, baseMat, NODES.length);
+instMesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(NODES.length * 3), 3);
+const dummy = new THREE.Object3D();
+const colorObj = new THREE.Color();
+
+let hotCount = 0;
+NODES.forEach((n, i) => {
+  const p = neuronPos(n.layer, n.dim);
+  const heat = heatMap.get(`${n.layer}.${n.dim}`) || 0;
+  const isHot = heat > 0;
+  dummy.position.copy(p);
+  let scale = 1;
+  if (n.named) scale = 3.2;
+  else if (isHot) { scale = 1.8 + Math.min(1.6, heat / 28); hotCount++; }
+  dummy.scale.setScalar(scale);
+  dummy.updateMatrix();
+  instMesh.setMatrixAt(i, dummy.matrix);
+
+  // OVERBRIGHT colors (>1.0 RGB) trigger bloom; <1.0 stay matte
+  if (n.dim === 715)        colorObj.setRGB(3.2, 0.18, 0.36);   // INHIBITOR red
+  else if (n.dim === 758)   colorObj.setRGB(0.20, 2.8, 0.65);   // CONTROLLER green
+  else if (n.dim === 279 || n.dim === 382 || n.dim === 476)
+                            colorObj.setRGB(0.45, 1.05, 2.8);   // pathway blue
+  else if (n.named)         colorObj.setRGB(2.6, 2.0, 0.30);    // generic anchor gold
+  else if (isHot) {
+    const t = Math.min(1, heat / 40);
+    colorObj.setRGB(2.2 + 0.6 * t, 1.2 + 0.4 * t, 0.25 + 0.15 * t);  // hot orange/amber overbright
+  }
+  else                      colorObj.setRGB(0.18, 0.21, 0.32);  // unnamed dim grey (no bloom)
+  instMesh.setColorAt(i, colorObj);
+});
+instMesh.instanceMatrix.needsUpdate = true;
+instMesh.instanceColor.needsUpdate = true;
+scene.add(instMesh);
+document.getElementById('s-named').textContent = `8 named + ${hotCount} Mercury hot`;
+
+// === cross-model side towers (phi3 + mistral) ===
+const SIDE_OFFSET_X = 80;
+const SIDE_LAYER_SPACING = 12;
+const SIDE_GRID = 24;  // 24x* mini grid
+function sideTowerNode(model, layer, scale) {
+  const xOffset = model === 'phi3' ? -SIDE_OFFSET_X - LAYER_W/2 : SIDE_OFFSET_X + LAYER_W/2;
+  return { x: xOffset, y: layer * SIDE_LAYER_SPACING + (TOWER_MID_Y - 18 * 18 / 2), z: 0 };
+}
+
+function buildSideTower(name, color, n_layers, matchMatrix) {
+  const xBase = name === 'phi3' ? -SIDE_OFFSET_X - LAYER_W/2 - 18 : SIDE_OFFSET_X + LAYER_W/2 + 18;
+  const yBase = TOWER_MID_Y - (n_layers * SIDE_LAYER_SPACING) / 2;
+  // build slab per layer
+  for (let L = 0; L < n_layers; L++) {
+    const y = yBase + L * SIDE_LAYER_SPACING;
+    const slab = new THREE.Mesh(
+      new THREE.BoxGeometry(20, 0.6, 14),
+      new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.18, depthWrite: false })
+    );
+    slab.position.set(xBase, y, 0);
+    scene.add(slab);
+    // border
+    const edge = new THREE.LineSegments(
+      new THREE.EdgesGeometry(slab.geometry),
+      new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.45 })
+    );
+    edge.position.copy(slab.position);
+    scene.add(edge);
+    // small label
+    const lc = document.createElement('canvas');
+    lc.width = 96; lc.height = 32;
+    const cx = lc.getContext('2d');
+    cx.fillStyle = '#' + color.toString(16).padStart(6, '0');
+    cx.font = 'bold 18px sans-serif';
+    cx.fillText(`${name[0].toUpperCase()}${L}`, 4, 22);
+    const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(lc), transparent: true, depthTest: false }));
+    sp.position.set(xBase + (name === 'phi3' ? -14 : 14), y, 0);
+    sp.scale.set(6, 2, 1);
+    scene.add(sp);
+  }
+  // cross-arch match lines: for each qwen layer, find best matching layer in this model
+  for (let qL = 0; qL < N_LAYERS; qL++) {
+    const row = matchMatrix[qL];
+    if (!row) continue;
+    let best = -1, bestSim = -1;
+    for (let oL = 0; oL < row.length; oL++) {
+      const sim = row[oL];
+      if (sim && sim > bestSim && sim > 0.65) { bestSim = sim; best = oL; }
+    }
+    if (best < 0) continue;
+    const a = new THREE.Vector3(0, qL * LAYER_SPACING, 0);
+    const b = new THREE.Vector3(xBase, yBase + best * SIDE_LAYER_SPACING, 0);
+    const g = new THREE.BufferGeometry().setFromPoints([a, b]);
+    const opacity = Math.min(0.7, (bestSim - 0.65) * 2);
+    const l = new THREE.Line(g, new THREE.LineBasicMaterial({ color, transparent: true, opacity }));
+    scene.add(l);
+  }
+}
+
+buildSideTower('phi3', 0xa78bfa, MATCH_PHI3.n_layer_b, MATCH_PHI3.matrix);
+buildSideTower('mistral', 0x6ee7b7, MATCH_MISTRAL.n_layer_b, MATCH_MISTRAL.matrix);
+
+// === highways: Mercury anchor pathways as glowing tubes + flowing particles + always-on ring at every layer ===
+const ANCHOR_DIMS = [11, 25, 279, 382, 476, 481, 715, 758];
+const flowParticles = [];
+
+// build glowing sprite texture once
+function makeGlowTexture() {
+  const c = document.createElement('canvas');
+  c.width = 128; c.height = 128;
+  const g = c.getContext('2d');
+  const grad = g.createRadialGradient(64, 64, 0, 64, 64, 64);
+  grad.addColorStop(0, 'rgba(255,255,255,1)');
+  grad.addColorStop(0.3, 'rgba(255,255,255,0.8)');
+  grad.addColorStop(0.6, 'rgba(255,255,255,0.2)');
+  grad.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = grad; g.fillRect(0, 0, 128, 128);
+  const tex = new THREE.CanvasTexture(c);
+  tex.needsUpdate = true;
+  return tex;
+}
+const GLOW_TEX = makeGlowTexture();
+
+for (const dim of ANCHOR_DIMS) {
+  const pts = [];
+  for (let L = 0; L < N_LAYERS; L++) pts.push(neuronPos(L, dim));
+  let col = C_ANCHOR;
+  if (dim === 715) col = C_INHIBITOR;
+  else if (dim === 758) col = C_CONTROLLER;
+  else if (dim === 279 || dim === 382 || dim === 476) col = C_PATHWAY;
+
+  // glowing tube along the highway
+  const curve = new THREE.CatmullRomCurve3(pts);
+  const tubeGeom = new THREE.TubeGeometry(curve, N_LAYERS * 2, 0.18, 8, false);
+  const tubeMat = new THREE.MeshStandardMaterial({
+    color: col, emissive: col, emissiveIntensity: 0.6, transparent: true, opacity: 0.55,
+    roughness: 0.4, metalness: 0.1
+  });
+  const tube = new THREE.Mesh(tubeGeom, tubeMat);
+  tube.userData = { kind: 'highway', dim };
+  scene.add(tube);
+
+  // 3 flowing additive sprites per highway, staggered phase
+  for (let k = 0; k < 3; k++) {
+    const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
+      map: GLOW_TEX, color: col, transparent: true, opacity: 0.85,
+      blending: THREE.AdditiveBlending, depthWrite: false
+    }));
+    sprite.scale.set(4, 4, 1);
+    sprite.userData = { dim, phase: k / 3, base_x: neuronPos(0, dim).x, base_z: neuronPos(0, dim).z };
+    scene.add(sprite);
+    flowParticles.push(sprite);
+  }
+}
+
+// === picking ===
+const raycaster = new THREE.Raycaster();
+raycaster.params.Points = { threshold: 0.5 };
+const mouse = new THREE.Vector2();
+let highlightGroup = new THREE.Group();
+scene.add(highlightGroup);
+
+function clearHighlight() {
+  while (highlightGroup.children.length) {
+    const c = highlightGroup.children.pop();
+    c.geometry?.dispose();
+    c.material?.dispose();
+  }
+}
+
+// === multi-hop cascade tracer ===
+// Forward: from clicked neuron, follow top-K_PER_HOP outgoing edges, recursively MAX_HOPS layers
+// Backward: same but via incoming edges
+const MAX_HOPS = 5;
+const K_PER_HOP = 3;
+
+function traceForward(startLayer, startDim) {
+  const visited = new Set([`${startLayer}.${startDim}`]);
+  const edgesOut = [];
+  let frontier = [{ layer: startLayer, dim: startDim }];
+  for (let hop = 0; hop < MAX_HOPS; hop++) {
+    const next = [];
+    for (const node of frontier) {
+      const outs = (edgesBySource.get(`${node.layer}.${node.dim}`) || [])
+        .slice().sort((a, b) => Math.abs(b.weight) - Math.abs(a.weight)).slice(0, K_PER_HOP);
+      for (const e of outs) {
+        edgesOut.push({ ...e, hop });
+        const key = `${e.dst_layer}.${e.dst_dim}`;
+        if (!visited.has(key)) {
+          visited.add(key);
+          next.push({ layer: e.dst_layer, dim: e.dst_dim });
+        }
+      }
+    }
+    frontier = next;
+    if (!frontier.length) break;
+  }
+  return edgesOut;
+}
+
+function traceBackward(startLayer, startDim) {
+  const visited = new Set([`${startLayer}.${startDim}`]);
+  const edgesOut = [];
+  let frontier = [{ layer: startLayer, dim: startDim }];
+  for (let hop = 0; hop < MAX_HOPS; hop++) {
+    const next = [];
+    for (const node of frontier) {
+      const ins = (edgesByTarget.get(`${node.layer}.${node.dim}`) || [])
+        .slice().sort((a, b) => Math.abs(b.weight) - Math.abs(a.weight)).slice(0, K_PER_HOP);
+      for (const e of ins) {
+        edgesOut.push({ ...e, hop });
+        const key = `${e.src_layer}.${e.src_dim}`;
+        if (!visited.has(key)) {
+          visited.add(key);
+          next.push({ layer: e.src_layer, dim: e.src_dim });
+        }
+      }
+    }
+    frontier = next;
+    if (!frontier.length) break;
+  }
+  return edgesOut;
+}
+
+function highlightNeuron(node) {
+  clearHighlight();
+  const p = neuronPos(node.layer, node.dim);
+
+  // pulsing halo (animated in tick loop)
+  const halo = new THREE.Mesh(
+    new THREE.SphereGeometry(2.0, 20, 20),
+    new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.45, wireframe: true })
+  );
+  halo.position.copy(p);
+  halo.userData.pulse = true;
+  highlightGroup.add(halo);
+
+  // residual highway (this dim through all 36 layers) — thick gold tube
+  const respts = [];
+  for (let L = 0; L < N_LAYERS; L++) respts.push(neuronPos(L, node.dim));
+  const resgeom = new THREE.BufferGeometry().setFromPoints(respts);
+  const resline = new THREE.Line(resgeom, new THREE.LineBasicMaterial({
+    color: C_HIGHWAY, transparent: true, opacity: 0.95
+  }));
+  highlightGroup.add(resline);
+
+  // node markers along residual highway
+  for (let L = 0; L < N_LAYERS; L++) {
+    const m = new THREE.Mesh(
+      new THREE.SphereGeometry(0.5, 8, 8),
+      new THREE.MeshBasicMaterial({ color: C_HIGHWAY, transparent: true, opacity: 0.7 })
+    );
+    m.position.copy(neuronPos(L, node.dim));
+    highlightGroup.add(m);
+  }
+
+  // === forward cascade (going UP through layers) ===
+  const fwd = traceForward(node.layer, node.dim);
+  for (const e of fwd) {
+    const a = neuronPos(e.src_layer, e.src_dim);
+    const b = neuronPos(e.dst_layer, e.dst_dim);
+    const g = new THREE.BufferGeometry().setFromPoints([a, b]);
+    // fade with hop depth: hop 0 = bright, hop 4 = dim
+    const hopFade = 1 - e.hop / MAX_HOPS * 0.65;
+    const col = e.weight >= 0 ? C_EDGE_POS : C_EDGE_NEG;
+    const opacity = Math.min(0.9, (0.4 + Math.abs(e.weight) * 0.8) * hopFade);
+    const l = new THREE.Line(g, new THREE.LineBasicMaterial({ color: col, transparent: true, opacity }));
+    highlightGroup.add(l);
+    // small dot at destination
+    if (e.hop < 3) {
+      const dot = new THREE.Mesh(
+        new THREE.SphereGeometry(0.45, 8, 8),
+        new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.8 * hopFade })
+      );
+      dot.position.copy(b);
+      highlightGroup.add(dot);
+    }
+  }
+
+  // === backward cascade (going DOWN through layers) ===
+  const bwd = traceBackward(node.layer, node.dim);
+  for (const e of bwd) {
+    const a = neuronPos(e.src_layer, e.src_dim);
+    const b = neuronPos(e.dst_layer, e.dst_dim);
+    const g = new THREE.BufferGeometry().setFromPoints([a, b]);
+    const hopFade = 1 - e.hop / MAX_HOPS * 0.65;
+    // backward edges in cooler cyan to distinguish from forward
+    const col = e.weight >= 0 ? 0x7dd3fc : 0xff6b6b;
+    const opacity = Math.min(0.8, (0.3 + Math.abs(e.weight) * 0.7) * hopFade);
+    const l = new THREE.Line(g, new THREE.LineBasicMaterial({ color: col, transparent: true, opacity }));
+    highlightGroup.add(l);
+    if (e.hop < 3) {
+      const dot = new THREE.Mesh(
+        new THREE.SphereGeometry(0.4, 8, 8),
+        new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.7 * hopFade })
+      );
+      dot.position.copy(a);
+      highlightGroup.add(dot);
+    }
+  }
+
+  // panel uses immediate-neighbor edges (top-10 each direction)
+  const outsImmediate = edgesBySource.get(`${node.layer}.${node.dim}`) || [];
+  const insImmediate = edgesByTarget.get(`${node.layer}.${node.dim}`) || [];
+  showPanel(node, outsImmediate, insImmediate, fwd.length, bwd.length);
+}
+
+function showPanel(node, outs, ins, fwdN, bwdN) {
+  const panel = document.getElementById('panel');
+  const body = document.getElementById('panel-body');
+  let metaHTML = '';
+  if (node.named) {
+    let cls = '';
+    if (node.dim === 715) cls = '';
+    else if (node.dim === 758) cls = 'controller';
+    else if ([279, 382, 476].includes(node.dim)) cls = 'pathway';
+    metaHTML = `<div class="meta ${cls}"><b>${node.name}</b><br>${node.role}</div>`;
+  } else {
+    metaHTML = `<div class="meta" style="border-color:#3a4d5c;color:#7c7c8c">Unnamed neuron — no Mercury observation yet.<br>This dim across all layers forms a residual highway. Pick a prompt with the Phase 2 overlay to see if it activates.</div>`;
+  }
+
+  let edgeHTML = '<div class="edges"><h3>↓ outgoing (top 10)</h3>';
+  for (const e of outs) {
+    const wcls = e.weight < 0 ? 'neg' : '';
+    edgeHTML += `<div class="edge" onclick="window.jumpTo(${e.dst_layer},${e.dst_dim})"><span>L${e.dst_layer}D${e.dst_dim}</span><span class="w ${wcls}">${e.weight >= 0 ? '+' : ''}${e.weight.toFixed(3)}</span></div>`;
+  }
+  edgeHTML += '<h3>↑ incoming (top 10)</h3>';
+  const insSorted = ins.slice().sort((a, b) => Math.abs(b.weight) - Math.abs(a.weight)).slice(0, 10);
+  for (const e of insSorted) {
+    const wcls = e.weight < 0 ? 'neg' : '';
+    edgeHTML += `<div class="edge" onclick="window.jumpTo(${e.src_layer},${e.src_dim})"><span>L${e.src_layer}D${e.src_dim}</span><span class="w ${wcls}">${e.weight >= 0 ? '+' : ''}${e.weight.toFixed(3)}</span></div>`;
+  }
+  edgeHTML += '</div>';
+
+  const cascadeHTML = (fwdN !== undefined) ? `
+    <div class="row"><span>↑ forward cascade (5 hops)</span><b style="color:#fbbf24">${fwdN} edges</b></div>
+    <div class="row"><span>↓ backward cascade (5 hops)</span><b style="color:#7dd3fc">${bwdN} edges</b></div>
+  ` : '';
+  body.innerHTML = `
+    <h2>L${node.layer} · dim ${node.dim}</h2>
+    <div class="row"><span>layer</span><b>${node.layer} / 36</b></div>
+    <div class="row"><span>dim</span><b>${node.dim} / 2048</b></div>
+    <div class="row"><span>residual position</span><b>row ${Math.floor(node.dim / 64)}, col ${node.dim % 64}</b></div>
+    ${cascadeHTML}
+    ${metaHTML}
+    ${edgeHTML}
+  `;
+  panel.classList.add('show');
+}
+
+window.jumpTo = (layer, dim) => {
+  const node = NODES.find(n => n.layer === layer && n.dim === dim);
+  if (!node) return;
+  highlightNeuron(node);
+  const p = neuronPos(layer, dim);
+  // animate camera target + position to focus on node
+  const targetStart = controls.target.clone();
+  const targetEnd = p.clone();
+  const camStart = camera.position.clone();
+  // place camera offset from node so we can see the highway + cascade
+  const camEnd = p.clone().add(new THREE.Vector3(60, 30, 90));
+  const dur = 900;
+  const t0 = performance.now();
+  function fly() {
+    const t = Math.min(1, (performance.now() - t0) / dur);
+    const e = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;  // easeInOut
+    controls.target.lerpVectors(targetStart, targetEnd, e);
+    camera.position.lerpVectors(camStart, camEnd, e);
+    if (t < 1) requestAnimationFrame(fly);
+  }
+  fly();
+};
+
+window.closePanel = () => {
+  clearHighlight();
+  document.getElementById('panel').classList.remove('show');
+};
+
+// === click + hover handlers ===
+canvas.addEventListener('pointerdown', (e) => { mouse._dx = e.clientX; mouse._dy = e.clientY; });
+canvas.addEventListener('pointerup', (e) => {
+  if (Math.abs(e.clientX - mouse._dx) > 4 || Math.abs(e.clientY - mouse._dy) > 4) return;
+  mouse.x = (e.clientX / innerWidth) * 2 - 1;
+  mouse.y = -(e.clientY / innerHeight) * 2 + 1;
+  raycaster.setFromCamera(mouse, camera);
+  const hits = raycaster.intersectObject(instMesh);
+  if (hits.length) {
+    const idx = hits[0].instanceId;
+    const node = NODES[idx];
+    highlightNeuron(node);
+  }
+});
+
+// hover tooltip
+const tooltip = document.createElement('div');
+tooltip.style.cssText = 'position:fixed;pointer-events:none;background:rgba(11,15,25,.95);border:1px solid #1e2540;padding:6px 10px;border-radius:6px;font-size:11px;font-family:SF Mono,Menlo,monospace;color:#cdd6f4;display:none;z-index:50;line-height:1.4;backdrop-filter:blur(4px)';
+document.body.appendChild(tooltip);
+
+let lastHoverIdx = -1;
+canvas.addEventListener('pointermove', (e) => {
+  mouse.x = (e.clientX / innerWidth) * 2 - 1;
+  mouse.y = -(e.clientY / innerHeight) * 2 + 1;
+  raycaster.setFromCamera(mouse, camera);
+  const hits = raycaster.intersectObject(instMesh);
+  if (hits.length) {
+    const idx = hits[0].instanceId;
+    if (idx !== lastHoverIdx) {
+      lastHoverIdx = idx;
+      const n = NODES[idx];
+      const heat = heatMap.get(`${n.layer}.${n.dim}`) || 0;
+      const region = regionForLayer(n.layer);
+      let extra = '';
+      if (n.named) extra = `<div style="color:#fbbf24;font-weight:600;margin-top:2px">${n.name}</div><div style="color:#9ca3af">${n.role}</div>`;
+      else if (heat) extra = `<div style="color:#ff8c00;margin-top:2px">Mercury heat = ${heat}</div>`;
+      tooltip.innerHTML = `<div style="color:#7dd3fc">L${n.layer} · dim ${n.dim}</div><div style="color:#7c7c8c;font-size:10px">${region.name}</div>${extra}`;
+    }
+    tooltip.style.display = 'block';
+    tooltip.style.left = (e.clientX + 14) + 'px';
+    tooltip.style.top = (e.clientY + 14) + 'px';
+  } else {
+    tooltip.style.display = 'none';
+    lastHoverIdx = -1;
+  }
+});
+
+// === keyboard pan / reset ===
+const keys = {};
+addEventListener('keydown', e => { keys[e.key.toLowerCase()] = true; if (e.key.toLowerCase() === 'r') { camera.position.copy(HOME); controls.target.set(0, N_LAYERS * LAYER_SPACING / 2, 0); } });
+addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
+
+const clock = new THREE.Clock();
+function tick() {
+  requestAnimationFrame(tick);
+  const PAN = 2;
+  if (keys['w']) { camera.position.z -= PAN; controls.target.z -= PAN; }
+  if (keys['s']) { camera.position.z += PAN; controls.target.z += PAN; }
+  if (keys['a']) { camera.position.x -= PAN; controls.target.x -= PAN; }
+  if (keys['d']) { camera.position.x += PAN; controls.target.x += PAN; }
+  if (keys['arrowup']) { camera.position.y += PAN; controls.target.y += PAN; }
+  if (keys['arrowdown']) { camera.position.y -= PAN; controls.target.y -= PAN; }
+
+  // animate flowing particles on anchor highways
+  const t = clock.getElapsedTime();
+  // pulse selected halo
+  for (const c of highlightGroup.children) {
+    if (c.userData && c.userData.pulse) {
+      const s = 1 + 0.25 * Math.sin(t * 3);
+      c.scale.setScalar(s);
+      c.material.opacity = 0.3 + 0.25 * Math.sin(t * 3);
+    }
+  }
+  const cycle = 6;  // seconds for one full trip up the highway
+  for (const p of flowParticles) {
+    const phase = ((t / cycle) + p.userData.phase) % 1;
+    p.position.y = phase * (N_LAYERS - 1) * LAYER_SPACING;
+    p.position.x = p.userData.base_x;
+    p.position.z = p.userData.base_z;
+    p.material.opacity = 0.4 + 0.5 * Math.sin(phase * Math.PI);
+  }
+
+  controls.update();
+  composer.render();
+}
+
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+  composer.setSize(innerWidth, innerHeight);
+});
+
+// idle auto-rotate
+controls.autoRotate = true;
+controls.autoRotateSpeed = 0.35;
+let lastInteract = performance.now();
+['pointerdown','wheel','keydown'].forEach(ev => addEventListener(ev, () => { lastInteract = performance.now(); controls.autoRotate = false; }));
+setInterval(() => { if (performance.now() - lastInteract > 6000) controls.autoRotate = true; }, 1000);
+
+document.getElementById('loading').style.display = 'none';
+tick();
+
+// === search box ===
+function parseQuery(q) {
+  q = q.trim().toLowerCase();
+  // forms: "715", "l17.d715", "l17d715", "17.715", "17/715"
+  let m = q.match(/^l?(\d+)[.\/d]+(\d+)$/);
+  if (m) return { layer: +m[1], dim: +m[2] };
+  m = q.match(/^d?(\d+)$/);
+  if (m) {
+    const dim = +m[1];
+    // search for any layer where this dim is named or hot
+    const candidate = NODES.find(n => n.dim === dim && (n.named || heatMap.get(`${n.layer}.${n.dim}`)));
+    if (candidate) return { layer: candidate.layer, dim };
+    return { layer: 17, dim };  // default to L17
+  }
+  return null;
+}
+function runSearch() {
+  const q = document.getElementById('searchInput').value;
+  const r = parseQuery(q);
+  if (!r) { document.getElementById('searchInput').style.borderColor = '#ff1744'; return; }
+  document.getElementById('searchInput').style.borderColor = '#7dd3fc';
+  window.jumpTo(r.layer, r.dim);
+}
+document.getElementById('searchGo').onclick = runSearch;
+document.getElementById('searchInput').addEventListener('keydown', e => { if (e.key === 'Enter') runSearch(); });
+
+// === reset ===
+document.getElementById('btnReset').onclick = () => {
+  camera.position.copy(HOME);
+  controls.target.set(0, TOWER_MID_Y, 0);
+  closePanel();
+};
+
+// === screenshot ===
+document.getElementById('btnShot').onclick = () => {
+  composer.render();
+  canvas.toBlob(b => {
+    const url = URL.createObjectURL(b);
+    const a = document.createElement('a');
+    a.href = url;
+    const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    a.download = `qwen3b-atlas-${ts}.png`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }, 'image/png');
+};
+
+// === tour anchors: auto-jump through all 8 named ===
+const TOUR_TARGETS = [
+  { layer: 17, dim: 715 }, { layer: 22, dim: 758 },
+  { layer: 14, dim: 279 }, { layer: 19, dim: 382 },
+  { layer: 25, dim: 476 }, { layer: 10, dim: 481 },
+  { layer: 8,  dim: 11  }, { layer: 30, dim: 25  },
+];
+let tourTimer = null;
+document.getElementById('btnTour').onclick = () => {
+  if (tourTimer) { clearInterval(tourTimer); tourTimer = null; document.getElementById('btnTour').textContent = '🎬 tour anchors'; return; }
+  let i = 0;
+  document.getElementById('btnTour').textContent = '⏸ stop tour';
+  const step = () => { window.jumpTo(TOUR_TARGETS[i % TOUR_TARGETS.length].layer, TOUR_TARGETS[i % TOUR_TARGETS.length].dim); i++; };
+  step();
+  tourTimer = setInterval(step, 4000);
+};
+
+// auto-jump to dim 715 in layer 17 as opening shot
+setTimeout(() => window.jumpTo(17, 715), 500);
+</script>
+</body>
+</html>

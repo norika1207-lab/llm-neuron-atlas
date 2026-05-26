@@ -143,7 +143,7 @@ Pull requests welcome for new model families.
 
 | Metric | Value |
 |---|---|
-| Bake time (Qwen 3B, GX10 CPU) | 85 seconds |
+| Bake time (Qwen 3B, modern CPU) | 60 to 120 seconds |
 | Output size | 117 MB JSON, gzip 35 MB |
 | Viewer load time | 5 to 10 seconds on broadband |
 | Viewer FPS | 60 on M2 MacBook Air, 30 on older laptops |

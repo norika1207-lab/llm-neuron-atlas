@@ -81,15 +81,17 @@ The 5 layer regions are colored after Mercury Tier-B analysis:
 
 ## Quickstart
 
+Pure CPU pipeline. Runs on any laptop.
+
 ```bash
 git clone https://github.com/norika1207-lab/llm-neuron-atlas
 cd llm-neuron-atlas
 pip install -r requirements.txt
 
-# 1. download Qwen 2.5 3B (6 GB, takes a few minutes)
+# 1. download Qwen 2.5 3B (6 GB)
 huggingface-cli download Qwen/Qwen2.5-3B --local-dir weights/Qwen2.5-3B
 
-# 2. bake the graph (85 seconds on CPU)
+# 2. bake the graph
 python bake/extract_graph.py --weights weights/Qwen2.5-3B --out viewer/graph
 
 # 3. serve viewer locally
@@ -119,7 +121,7 @@ Then open `http://localhost:8000`.
 9. Viewer fetches all four JSONs, renders via three.js InstancedMesh + bloom
 ```
 
-Total output: 117 MB JSON, gzipped to about 35 MB. Bake is CPU-bound (matrix multiplication + np.argpartition), GPU not used.
+Total output: 117 MB JSON, gzipped to about 35 MB. Pure CPU pipeline (matrix multiplication + np.argpartition), runs on any laptop. No GPU, no accelerator, no cloud required.
 
 ---
 
@@ -143,7 +145,7 @@ Pull requests welcome for new model families.
 
 | Metric | Value |
 |---|---|
-| Bake time (Qwen 3B, modern CPU) | 60 to 120 seconds |
+| Bake (Qwen 3B) | CPU only, no GPU needed |
 | Output size | 117 MB JSON, gzip 35 MB |
 | Viewer load time | 5 to 10 seconds on broadband |
 | Viewer FPS | 60 on M2 MacBook Air, 30 on older laptops |

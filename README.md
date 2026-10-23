@@ -224,3 +224,7 @@ Author: **Norika Oda**
 ・ORCID [0009-0006-6816-9891](https://orcid.org/0009-0006-6816-9891)
 ・[Google Scholar](https://scholar.google.com/citations?user=wrTR3VMAAAAJ)
 ・GitHub [@norika1207-lab](https://github.com/norika1207-lab)
+
+---
+
+Author: Norika Oda (織田紀香) · https://norika.tw
